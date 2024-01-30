@@ -81,8 +81,8 @@ type PlanGraphBuilder struct {
 	// ImportTargets are the list of resources to import.
 	ImportTargets []*ImportTarget
 
-	// EndpointsToForget are the list of resources to forget from the state.
-	EndpointsToForget []addrs.ConfigRemovable
+	// EndpointsToRemove are the list of resources to forget from the state.
+	EndpointsToRemove []addrs.ConfigRemovable
 
 	// GenerateConfig tells OpenTofu where to write and generated config for
 	// any import targets that do not already have configuration.
@@ -267,7 +267,7 @@ func (b *PlanGraphBuilder) initPlan() {
 			NodeAbstractResourceInstance: a,
 			skipRefresh:                  b.skipRefresh,
 			skipPlanChanges:              b.skipPlanChanges,
-			EndpointsToForget:            b.EndpointsToForget,
+			EndpointsToRemove:            b.EndpointsToRemove,
 		}
 	}
 
@@ -278,7 +278,7 @@ func (b *PlanGraphBuilder) initPlan() {
 
 			skipRefresh:       b.skipRefresh,
 			skipPlanChanges:   b.skipPlanChanges,
-			EndpointsToForget: b.EndpointsToForget,
+			EndpointsToRemove: b.EndpointsToRemove,
 		}
 	}
 }
