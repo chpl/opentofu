@@ -5263,6 +5263,7 @@ locals {
 }
 
 func TestContext2Plan_removedResourceBasic(t *testing.T) {
+	desposedKey := states.DeposedKey("deposed")
 	addr := mustResourceInstanceAddr("test_object.a")
 	m := testModuleInline(t, map[string]string{
 		"main.tf": `
@@ -5279,6 +5280,16 @@ func TestContext2Plan_removedResourceBasic(t *testing.T) {
 			AttrsJSON: []byte(`{}`),
 			Status:    states.ObjectReady,
 		}, mustProviderConfig(`provider["registry.opentofu.org/hashicorp/test"]`))
+		s.SetResourceInstanceDeposed(
+			mustResourceInstanceAddr(addr.String()),
+			desposedKey,
+			&states.ResourceInstanceObjectSrc{
+				Status:       states.ObjectTainted,
+				AttrsJSON:    []byte(`{"test_string":"old"}`),
+				Dependencies: []addrs.ConfigResource{},
+			},
+			mustProviderConfig(`provider["registry.opentofu.org/hashicorp/test"]`),
+		)
 	})
 
 	p := simpleMockProvider()
@@ -5298,28 +5309,41 @@ func TestContext2Plan_removedResourceBasic(t *testing.T) {
 		t.Fatalf("unexpected errors\n%s", diags.Err().Error())
 	}
 
-	t.Run(addr.String(), func(t *testing.T) {
-		instPlan := plan.Changes.ResourceInstance(addr)
-		if instPlan == nil {
-			t.Fatalf("no plan for %s at all", addr)
-		}
+	for _, test := range []struct {
+		deposedKey states.DeposedKey
+		wantReason plans.ResourceInstanceChangeActionReason
+	}{{desposedKey, plans.ResourceInstanceChangeNoReason}, {states.NotDeposed, plans.ResourceInstanceDeleteBecauseNoResourceConfig}} {
+		t.Run(addr.String(), func(t *testing.T) {
+			var instPlan *plans.ResourceInstanceChangeSrc
 
-		if got, want := instPlan.Addr, addr; !got.Equal(want) {
-			t.Errorf("wrong current address\ngot:  %s\nwant: %s", got, want)
-		}
-		if got, want := instPlan.PrevRunAddr, addr; !got.Equal(want) {
-			t.Errorf("wrong previous run address\ngot:  %s\nwant: %s", got, want)
-		}
-		if got, want := instPlan.Action, plans.Forget; got != want {
-			t.Errorf("wrong planned action\ngot:  %s\nwant: %s", got, want)
-		}
-		if got, want := instPlan.ActionReason, plans.ResourceInstanceDeleteBecauseNoResourceConfig; got != want {
-			t.Errorf("wrong action reason\ngot:  %s\nwant: %s", got, want)
-		}
-	})
+			if test.deposedKey == states.NotDeposed {
+				instPlan = plan.Changes.ResourceInstance(addr)
+			} else {
+				instPlan = plan.Changes.ResourceInstanceDeposed(addr, test.deposedKey)
+			}
+
+			if instPlan == nil {
+				t.Fatalf("no plan for %s at all", addr)
+			}
+
+			if got, want := instPlan.Addr, addr; !got.Equal(want) {
+				t.Errorf("wrong current address\ngot:  %s\nwant: %s", got, want)
+			}
+			if got, want := instPlan.PrevRunAddr, addr; !got.Equal(want) {
+				t.Errorf("wrong previous run address\ngot:  %s\nwant: %s", got, want)
+			}
+			if got, want := instPlan.Action, plans.Forget; got != want {
+				t.Errorf("wrong planned action\ngot:  %s\nwant: %s", got, want)
+			}
+			if got, want := instPlan.ActionReason, test.wantReason; got != want {
+				t.Errorf("wrong action reason\ngot:  %s\nwant: %s", got, want)
+			}
+		})
+	}
 }
 
 func TestContext2Plan_removedModuleBasic(t *testing.T) {
+	desposedKey := states.DeposedKey("deposed")
 	addr := mustResourceInstanceAddr("module.mod.test_object.a")
 	m := testModuleInline(t, map[string]string{
 		"main.tf": `
@@ -5336,6 +5360,16 @@ func TestContext2Plan_removedModuleBasic(t *testing.T) {
 			AttrsJSON: []byte(`{}`),
 			Status:    states.ObjectReady,
 		}, mustProviderConfig(`provider["registry.opentofu.org/hashicorp/test"]`))
+		s.SetResourceInstanceDeposed(
+			mustResourceInstanceAddr(addr.String()),
+			desposedKey,
+			&states.ResourceInstanceObjectSrc{
+				Status:       states.ObjectTainted,
+				AttrsJSON:    []byte(`{"test_string":"old"}`),
+				Dependencies: []addrs.ConfigResource{},
+			},
+			mustProviderConfig(`provider["registry.opentofu.org/hashicorp/test"]`),
+		)
 	})
 
 	p := simpleMockProvider()
@@ -5355,25 +5389,37 @@ func TestContext2Plan_removedModuleBasic(t *testing.T) {
 		t.Fatalf("unexpected errors\n%s", diags.Err().Error())
 	}
 
-	t.Run(addr.String(), func(t *testing.T) {
-		instPlan := plan.Changes.ResourceInstance(addr)
-		if instPlan == nil {
-			t.Fatalf("no plan for %s at all", addr)
-		}
+	for _, test := range []struct {
+		deposedKey states.DeposedKey
+		wantReason plans.ResourceInstanceChangeActionReason
+	}{{desposedKey, plans.ResourceInstanceChangeNoReason}, {states.NotDeposed, plans.ResourceInstanceDeleteBecauseNoResourceConfig}} {
+		t.Run(addr.String(), func(t *testing.T) {
+			var instPlan *plans.ResourceInstanceChangeSrc
 
-		if got, want := instPlan.Addr, addr; !got.Equal(want) {
-			t.Errorf("wrong current address\ngot:  %s\nwant: %s", got, want)
-		}
-		if got, want := instPlan.PrevRunAddr, addr; !got.Equal(want) {
-			t.Errorf("wrong previous run address\ngot:  %s\nwant: %s", got, want)
-		}
-		if got, want := instPlan.Action, plans.Forget; got != want {
-			t.Errorf("wrong planned action\ngot:  %s\nwant: %s", got, want)
-		}
-		if got, want := instPlan.ActionReason, plans.ResourceInstanceDeleteBecauseNoResourceConfig; got != want {
-			t.Errorf("wrong action reason\ngot:  %s\nwant: %s", got, want)
-		}
-	})
+			if test.deposedKey == states.NotDeposed {
+				instPlan = plan.Changes.ResourceInstance(addr)
+			} else {
+				instPlan = plan.Changes.ResourceInstanceDeposed(addr, test.deposedKey)
+			}
+
+			if instPlan == nil {
+				t.Fatalf("no plan for %s at all", addr)
+			}
+
+			if got, want := instPlan.Addr, addr; !got.Equal(want) {
+				t.Errorf("wrong current address\ngot:  %s\nwant: %s", got, want)
+			}
+			if got, want := instPlan.PrevRunAddr, addr; !got.Equal(want) {
+				t.Errorf("wrong previous run address\ngot:  %s\nwant: %s", got, want)
+			}
+			if got, want := instPlan.Action, plans.Forget; got != want {
+				t.Errorf("wrong planned action\ngot:  %s\nwant: %s", got, want)
+			}
+			if got, want := instPlan.ActionReason, test.wantReason; got != want {
+				t.Errorf("wrong action reason\ngot:  %s\nwant: %s", got, want)
+			}
+		})
+	}
 }
 
 func TestContext2Plan_removedModuleForgetsAllInstances(t *testing.T) {
